@@ -1,85 +1,245 @@
 # 🖇 HAR-Safety-AI
-[![HF Model](https://img.shields.io/badge/HF%20Model-npc_LoRA--fps-ff69b4)](https://huggingface.co/m97j/har-safety-model)
-[![Colab](https://img.shields.io/badge/Colab-Notebook-yellow)](https://colab.research.google.com/drive/1Nv46aBuSGtsPjjckHdpfFWRMAqbwj5Bh?usp=sharing)
 
-**Multimodal Pose-Image Fusion-Based Action Recognition Model**
+[![Hugging Face Model](https://img.shields.io/badge/Hugging_Face-model_card-ff69b4)](https://huggingface.co/m97j/har-safety-model)
 
----
-
-## 📌 Project Overview
-- **Goal**: **Real-time hazardous action recognition in public safety and industrial settings**
-
-- **Approach**:
-
-  - OpenPose-based **pose sequence** + RGB **image sequence** fusion
-  - **2-Step Learning Strategy**: Pose-Specific Pre-training (MPOSE) → Multimodal Fine-tuning (HAA500)
-
-- **Core Design**:
-
-  - Temporal-Spatial Factorized Attention (PoseFormerFactorized)
-  
-  - Lightweight CNN (ImageEncoder)
-  
-  - Late Fusion (MultiModalFusionModel)
+**Multimodal Pose + Image Fusion-Based Action Recognition Model**
 
 ---
 
-## 🎯 Key Features
-1. **Multimodal Fusion**  
-   - Pose: Motion structure information, robust to background/illumination changes  
-   - Image: Provides object/environment contextual information
-   
-    → Improved recognition performance by combining complementary features
+# 📌 Project Overview
 
-2. **Efficient Transformer Architecture**
-  
-   - Temporal/Spatial Attention Separation
-   - Reduced computational load by more than 13x from $O(T^2J^2)$ to $O(T^2J + J^2T)$
+HAR-Safety-AI is a **real-time hazardous action recognition model** designed for safety-critical environments such as industrial sites and public facilities.
 
-3. **Real-time & Scalability**
+This model uses:
 
-   - Minimized inference latency with lightweight CNN and factorized attention
-   - Additional sensor data, such as IMU, can be fused.
+* **Pose sequence (skeleton)**
+* **RGB image sequence**
+
+and fuses them using a multi-scale transformer architecture for robust behavior classification.
 
 ---
 
-## 📂 Dataset
-- **MPOSE**: BODY_25 format, $T=30$ frame pose sequence
-- **HAA500**: RGB 480p, parallel extraction of OpenPose skeleton
-- All inputs are normalized and used in the PoseFormer encoder.
+# 🎯 Key Features
+
+### 1) **Multimodal Fusion**
+
+* **Pose**: Motion structure, invariant to illumination/background
+* **Image**: Context such as objects, environment
+* → Combining both yields higher robustness and accuracy
+
+### 2) **Efficient Transformer-Based Architecture**
+
+* Temporal/Spatial Factorized Attention (PoseFormerFactorized)
+* Reduced complexity from $(O(T^2J^2)) → (O(T^2J + J^2T))$
+
+### 3) **Real-time & Scalable**
+
+* Low latency inference
+* Modular: Easily extend to IMU, depth sensors, or other modalities
 
 ---
 
-## 🏗 Model Architecture
-- **PoseFormerFactorized**: Separate Temporal/Spatial Attention Training
-- **ImageEncoder**: ResNet-18 backbone, global pooling followed by embedding
-- **MultiModalFusionModel**: Late Fusion of pose and image features → Softmax classification
+# 📁 Repository Structure
+
+```
+har-safety-ai/
+│── models/
+│   ├── pose/
+│   │   └── poseformer_factorized.py
+│   ├── image/
+│   │   └── image_encoder.py
+│   ├── fusion/
+│   │   └── fusion_model.py
+│   └── multiscale_model.py
+│
+│── inference/
+│   ├── utils/
+│   │   ├── download_model.py
+│   │   ├── load_config.py
+│   │   └── load_labels.py
+│   ├── build_model.py
+│   ├── predictor.py
+│   └── example_infer.py
+│
+│── README.md
+```
 
 ---
 
-## 🚀 Training Strategy
-1. **Stage 1**: Pose-only pretraining (MPOSE)
+# 📦 Installation
 
-2. **Stage 2**: Multimodal fine-tuning (HAA500)
+```bash
+pip install torch torchvision
+pip install timm
+pip install huggingface_hub
+```
 
----
+(ResNet-18 is loaded from torchvision; timm optional if you switch backbones.)
 
-## 📊 Expected Performance and Usage
-- **Robustness**: Stable motion recognition even in diverse environments (lighting and background changes)
-- **Real-time**: Fast inference with factorized attention and lightweight CNN
-- **Scalability**: Applicable to various domains, including industrial safety, public safety, and sports analytics
+HuggingFace dependency:
 
----
-
-## ⚙️ Technology Stack
-- **Frameworks**: PyTorch, OpenPose
-- **Models**: PoseFormerFactorized, ResNet-18
-- **Data**: MPOSE, Kinetics-700
-- **Infra**: Colab, CUDA
+```
+huggingface_hub >= 0.23
+```
 
 ---
 
-## 📜 License
-MIT License
+# ⚡ Device Auto Selection
+
+The predictor automatically selects:
+
+* **CUDA (GPU)** if available
+* **CPU** otherwise
+
+You can override manually:
+
+```python
+predictor = HARPredictor(weight_path, config, device="cpu")
+```
 
 ---
+
+# 🧩 Input Format
+
+The model consumes **two parallel sequences**:
+
+---
+
+## 1) Pose Sequence
+
+**Tensor shape:**
+
+```
+(B, C, T, J, 3)
+```
+
+Where:
+
+| Dimension | Meaning                          |
+| --------- | -------------------------------- |
+| B         | batch size                       |
+| C         | channels (pose encoding streams) |
+| T         | 30 frames                        |
+| J         | 17 joints                        |
+| 3         | (x, y, confidence)               |
+
+---
+
+## 2) RGB Image Sequence
+
+**Tensor shape:**
+
+```
+(B, C, T, 3, 224, 224)
+```
+
+* Each frame is resized to **224 × 224**
+* Uses ResNet-18 backbone (modifiable)
+
+---
+
+# 🔍 Running Inference
+
+Below is the minimal working example:
+
+```python
+import torch
+
+from inference.utils.load_config import load_config
+from inference.utils.load_labels import load_labels
+from inference.utils.download_model import download_model
+from inference.predictor import HARPredictor
+
+cfg = load_config()
+labels = load_labels()
+
+predictor = HARPredictor(
+    weight_path=download_model(),
+    config=cfg
+)
+
+# Dummy inputs
+pose = torch.randn(1, 4, 30, 17, 3)
+img  = torch.randn(1, 4, 30, 3, 224, 224)
+
+topk_ids, topk_probs = predictor.topk(pose, img, k=5)
+
+print("Top-k Predictions:")
+for idx, score in zip(topk_ids[0], topk_probs[0]):
+    print(labels[str(idx.item())], f"{score.item():.4f}")
+```
+
+---
+
+# 📈 Output Format — Probability Distribution (Not Argmax!)
+
+Unlike standard classifiers, this model produces a **500-dimensional probability vector**.
+This design supports:
+
+---
+
+## ✔ Top-K Semantic Ranking
+
+```python
+topk_ids, topk_probs = predictor.topk(pose, img, k=5)
+```
+
+---
+
+## ✔ Threshold-based Filtering
+
+Useful in ambiguous actions:
+
+```python
+filtered = predictor.threshold(pose, img, thr=0.1)
+```
+
+---
+
+# 📊 Dataset
+
+Training is based on:
+
+### **MPOSE**
+
+* BODY_25 format
+* 30-frame pose sequences
+
+### **HAA500**
+
+* RGB videos + synchronized OpenPose skeleton
+
+---
+
+# 🏗 Model Architecture
+
+* **PoseFormerFactorized**
+  Temporal/Spatial attention separation
+
+* **ImageEncoder (ResNet-18)**
+  Extracts contextual features
+
+* **MultiModalFusionModel**
+  Late fusion + probability output
+
+---
+
+# 🚀 Training Strategy (Overview)
+
+1. **Stage 1 — Pose-only pretraining**
+   Train PoseFormerFactorized on MPOSE
+
+2. **Stage 2 — Multimodal fine-tuning**
+   Add RGB encoder and fusion module
+   Train on HAA500
+
+(Training code not included in this repository.)
+
+---
+
+# 📜 License
+
+Apache License 2.0
+
+---
+
