@@ -8,7 +8,7 @@
 
 # 📌 Project Overview
 
-HAR-Safety-AI is a **real-time hazardous action recognition model** designed for safety-critical environments such as industrial sites and public facilities.
+HAR-Safety-AI is a **real-time human action recognition model** designed for safety-critical environments such as industrial sites and public facilities.
 
 This model uses:
 
@@ -173,7 +173,7 @@ for idx, score in zip(topk_ids[0], topk_probs[0]):
 
 # 📈 Output Format — Probability Distribution (Not Argmax!)
 
-Unlike standard classifiers, this model produces a **500-dimensional probability vector**.
+Unlike standard classifiers, this model produces a **500-dimensional probability vector**.  
 This design supports:
 
 ---
@@ -213,25 +213,25 @@ Training is based on:
 
 # 🏗 Model Architecture
 
-* **PoseFormerFactorized**
+* **PoseFormerFactorized**  
   Temporal/Spatial attention separation
 
-* **ImageEncoder (ResNet-18)**
+* **ImageEncoder (ResNet-18)**  
   Extracts contextual features
 
-* **MultiModalFusionModel**
+* **MultiModalFusionModel**  
   Late fusion + probability output
 
 ---
 
 # 🚀 Training Strategy (Overview)
 
-1. **Stage 1 — Pose-only pretraining**
+1. **Stage 1 — Pose-only pretraining**  
    Train PoseFormerFactorized on MPOSE
 
-2. **Stage 2 — Multimodal fine-tuning**
-   Add RGB encoder and fusion module
-   Train on HAA500
+2. **Stage 2 — Multimodal fine-tuning**  
+   Add RGB encoder and fusion module  
+   Train on HAA500  
 
 (Training code not included in this repository.)
 
